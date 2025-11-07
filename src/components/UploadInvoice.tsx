@@ -1,12 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { NextResponse } from 'next/server'
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Gemini API Key
 const GEMINI_API_KEY = ""
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 interface InvoiceData {
   invoiceNumber: string
@@ -93,8 +92,17 @@ export function UploadInvoice() {
       }))
 
       // Convert file to base64
-      const buffer = await file.arrayBuffer()
-      const base64 = Buffer.from(buffer).toString('base64')
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = reader.result as string
+          // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
+          const base64String = result.split(',')[1] || result
+          resolve(base64String)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
 
       // Prepare file data
       const fileData = {
@@ -110,16 +118,21 @@ export function UploadInvoice() {
         : 'Please extract the following information from this invoice image: invoice number, invoice type, invoice date, amount, and vendor name. Please return in JSON format with keys: invoiceNumber, type, date, amount, vendor'
 
       // Use Gemini to analyze file
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: [prompt, fileData],
-        config: {
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.0-flash-exp",
+        generationConfig: {
           responseMimeType: 'application/json',
-        },
+        }
       });
-
+      
+      const result = await model.generateContent([
+        { text: prompt },
+        { inlineData: fileData.inlineData }
+      ]);
+      const response = await result.response;
+      
       // Parse JSON response
-      const responseText = response.text || '{}';
+      const responseText = response.text() || '{}';
       let rawInvoiceData;
       try {
         rawInvoiceData = JSON.parse(responseText);
