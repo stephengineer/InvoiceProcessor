@@ -36,6 +36,9 @@ jobs:
         env:
           NEXT_PUBLIC_GEMINI_API_KEY: ${{ secrets.NEXT_PUBLIC_GEMINI_API_KEY }}
       
+      - name: Create .nojekyll file
+        run: touch out/.nojekyll
+      
       - name: Setup Pages
         uses: actions/configure-pages@v4
       

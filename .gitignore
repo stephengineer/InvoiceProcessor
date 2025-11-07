@@ -85,6 +85,8 @@ web_modules
 
 # Next.js build output
 .next
+# Note: 'out' directory is ignored because it's generated during build
+# GitHub Actions will build and deploy the 'out' directory automatically
 out
 
 # Nuxt.js build / generate output
