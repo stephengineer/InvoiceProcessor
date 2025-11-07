@@ -16,7 +16,7 @@ interface InvoiceData {
   vendor: string
 }
 
-// 用于处理原始 API 响应的接口
+// Interface for handling raw API responses
 interface RawInvoiceData {
   invoiceNumber: string
   type: string
@@ -49,15 +49,15 @@ export function UploadInvoice() {
       selectedFiles.forEach(file => {
         const fileType = file.type
         
-        // 检查文件类型
+        // Check file type
         if (!fileType.startsWith('image/') && fileType !== 'application/pdf') {
-          errors.push(`${file.name}: 不支持的文件类型`)
+          errors.push(`${file.name}: Unsupported file type`)
           return
         }
 
-        // 检查文件大小（限制为10MB）
+        // Check file size (limit 10MB)
         if (file.size > 10 * 1024 * 1024) {
-          errors.push(`${file.name}: 文件大小超过10MB`)
+          errors.push(`${file.name}: File size exceeds 10MB`)
           return
         }
 
@@ -72,7 +72,7 @@ export function UploadInvoice() {
 
       setFiles(validFiles)
       
-      // 初始化上传进度
+      // Initialize upload progress
       const initialProgress: UploadProgress = {}
       validFiles.forEach(file => {
         initialProgress[file.name] = {
@@ -86,17 +86,17 @@ export function UploadInvoice() {
 
   const processFile = async (file: File) => {
     try {
-      // 更新状态为处理中
+      // Update status to processing
       setUploadProgress(prev => ({
         ...prev,
         [file.name]: { ...prev[file.name], status: 'processing', progress: 0 }
       }))
 
-      // 将文件转换为 base64
+      // Convert file to base64
       const buffer = await file.arrayBuffer()
       const base64 = Buffer.from(buffer).toString('base64')
 
-      // 准备文件数据
+      // Prepare file data
       const fileData = {
         inlineData: {
           data: base64,
@@ -104,12 +104,12 @@ export function UploadInvoice() {
         },
       }
 
-      // 根据文件类型选择不同的提示词
+      // Select different prompts based on file type
       const prompt = file.type === 'application/pdf'
-        ? '请分析这个PDF文件中的发票信息，提取以下信息：发票号码、发票类型、开票日期、金额、供应商名称。请以JSON格式返回，键名分别为：invoiceNumber, type, date, amount, vendor'
-        : '请提取这张发票图片的以下信息：发票号码、发票类型、开票日期、金额、供应商名称。请以JSON格式返回，键名分别为：invoiceNumber, type, date, amount, vendor'
+        ? 'Please analyze the invoice information in this PDF file and extract the following information: invoice number, invoice type, invoice date, amount, and vendor name. Please return in JSON format with keys: invoiceNumber, type, date, amount, vendor'
+        : 'Please extract the following information from this invoice image: invoice number, invoice type, invoice date, amount, and vendor name. Please return in JSON format with keys: invoiceNumber, type, date, amount, vendor'
 
-      // 使用 Gemini 分析文件
+      // Use Gemini to analyze file
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash",
         contents: [prompt, fileData],
@@ -118,28 +118,28 @@ export function UploadInvoice() {
         },
       });
 
-      // 解析 JSON 响应
+      // Parse JSON response
       const responseText = response.text || '{}';
       let rawInvoiceData;
       try {
         rawInvoiceData = JSON.parse(responseText);
       } catch (parseError) {
-        throw new Error('无法解析发票数据，请确保文件格式正确');
+        throw new Error('Failed to parse invoice data. Please ensure the file format is correct');
       }
 
-      // 如果rawInvoiceData是list，则取第一个
+      // If rawInvoiceData is a list, take the first one
       if (Array.isArray(rawInvoiceData)) {
         rawInvoiceData = rawInvoiceData[0];
       }
 
-      // 验证必要字段
+      // Validate required fields
       const requiredFields = ['invoiceNumber', 'type', 'date', 'amount', 'vendor'];
       const missingFields = requiredFields.filter(field => !rawInvoiceData[field]);
       if (missingFields.length > 0) {
-        throw new Error(`缺少必要字段: ${missingFields.join(', ')}`);
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
 
-      // 转换数据类型
+      // Convert data types
       const invoiceData = {
         invoiceNumber: String(rawInvoiceData.invoiceNumber),
         type: String(rawInvoiceData.type),
@@ -148,7 +148,7 @@ export function UploadInvoice() {
         vendor: String(rawInvoiceData.vendor),
       };
       
-      // 保存发票数据到后端
+      // Save invoice data to backend
       const saveResponse = await fetch('/api/invoices', {
         method: 'POST',
         headers: {
@@ -163,12 +163,12 @@ export function UploadInvoice() {
 
       if (!saveResponse.ok) {
         const errorData = await saveResponse.json();
-        throw new Error(errorData.error || '保存发票数据失败');
+        throw new Error(errorData.error || 'Failed to save invoice data');
       }
 
       const savedData = await saveResponse.json();
       
-      // 更新状态为成功
+      // Update status to success
       setUploadProgress(prev => ({
         ...prev,
         [file.name]: { 
@@ -181,14 +181,14 @@ export function UploadInvoice() {
 
       return invoiceData;
     } catch (error) {
-      // 更新状态为错误
+      // Update status to error
       setUploadProgress(prev => ({
         ...prev,
         [file.name]: { 
           ...prev[file.name], 
           status: 'error', 
           progress: 0,
-          error: error instanceof Error ? error.message : '处理失败'
+          error: error instanceof Error ? error.message : 'Processing failed'
         }
       }))
       throw error;
@@ -197,7 +197,7 @@ export function UploadInvoice() {
 
   const handleUpload = async () => {
     if (files.length === 0) {
-      setError('请选择文件')
+      setError('Please select files')
       return
     }
 
@@ -205,11 +205,11 @@ export function UploadInvoice() {
     setError(null)
 
     try {
-      // 并行处理所有文件
+      // Process all files in parallel
       await Promise.all(files.map(file => processFile(file)))
     } catch (error) {
       console.error('Upload error:', error)
-      setError('部分文件处理失败，请重试')
+      setError('Some files failed to process. Please try again')
     } finally {
       setUploading(false)
     }
@@ -227,9 +227,9 @@ export function UploadInvoice() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
             </svg>
             <p className="mb-2 text-sm text-gray-500">
-              <span className="font-semibold">点击上传</span> 或拖拽文件到这里
+              <span className="font-semibold">Click to upload</span> or drag files here
             </p>
-            <p className="text-xs text-gray-500">支持图片和PDF文件，大小不超过10MB</p>
+            <p className="text-xs text-gray-500">Supports images and PDF files, max size 10MB</p>
           </div>
           <input
             id="dropzone-file"
@@ -251,7 +251,7 @@ export function UploadInvoice() {
       {files.length > 0 && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-600">已选择 {files.length} 个文件</p>
+            <p className="text-sm text-gray-600">{files.length} file(s) selected</p>
             <button
               onClick={handleUpload}
               disabled={uploading}
@@ -263,14 +263,14 @@ export function UploadInvoice() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span>处理中...</span>
+                  <span>Processing...</span>
                 </>
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                   </svg>
-                  <span>开始处理</span>
+                  <span>Start Processing</span>
                 </>
               )}
             </button>
@@ -295,10 +295,10 @@ export function UploadInvoice() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>
-                        {uploadProgress[file.name].status === 'pending' && '等待处理'}
-                        {uploadProgress[file.name].status === 'processing' && '处理中...'}
-                        {uploadProgress[file.name].status === 'success' && '处理成功'}
-                        {uploadProgress[file.name].status === 'error' && '处理失败'}
+                        {uploadProgress[file.name].status === 'pending' && 'Pending'}
+                        {uploadProgress[file.name].status === 'processing' && 'Processing...'}
+                        {uploadProgress[file.name].status === 'success' && 'Success'}
+                        {uploadProgress[file.name].status === 'error' && 'Failed'}
                       </span>
                       <span>{uploadProgress[file.name].progress}%</span>
                     </div>
@@ -317,9 +317,9 @@ export function UploadInvoice() {
                     )}
                     {uploadProgress[file.name].result && (
                       <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                        <p className="font-medium">发票号码: {uploadProgress[file.name].result.invoiceNumber}</p>
-                        <p>类型: {uploadProgress[file.name].result.type}</p>
-                        <p>金额: ¥{uploadProgress[file.name].result.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="font-medium">Invoice Number: {uploadProgress[file.name].result.invoiceNumber}</p>
+                        <p>Type: {uploadProgress[file.name].result.type}</p>
+                        <p>Amount: ${uploadProgress[file.name].result.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
                     )}
                   </div>

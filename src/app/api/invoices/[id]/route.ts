@@ -9,7 +9,7 @@ export async function PATCH(
     const { id } = params
     const data = await request.json()
     
-    // 在实际应用中，这里应该是数据库更新操作
+    // In a real application, this should be a database update operation
     const invoiceIndex = mockInvoices.findIndex(inv => inv.id === id)
     if (invoiceIndex === -1) {
       return NextResponse.json(
@@ -18,7 +18,7 @@ export async function PATCH(
       )
     }
 
-    // 更新发票状态
+    // Update invoice status
     mockInvoices[invoiceIndex] = {
       ...mockInvoices[invoiceIndex],
       status: data.status,
