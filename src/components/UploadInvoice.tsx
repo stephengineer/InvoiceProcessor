@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Gemini API Key
-const GEMINI_API_KEY = ""
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Gemini API Key - Get from environment variable
+// For production, set this in Vercel/Netlify environment variables
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 interface InvoiceData {
   invoiceNumber: string
@@ -85,6 +86,11 @@ export function UploadInvoice() {
 
   const processFile = async (file: File) => {
     try {
+      // Check if API key is configured
+      if (!genAI || !GEMINI_API_KEY) {
+        throw new Error('Gemini API key is not configured. Please set NEXT_PUBLIC_GEMINI_API_KEY environment variable.');
+      }
+
       // Update status to processing
       setUploadProgress(prev => ({
         ...prev,
@@ -118,6 +124,10 @@ export function UploadInvoice() {
         : 'Please extract the following information from this invoice image: invoice number, invoice type, invoice date, amount, and vendor name. Please return in JSON format with keys: invoiceNumber, type, date, amount, vendor'
 
       // Use Gemini to analyze file
+      if (!genAI) {
+        throw new Error('Gemini API is not initialized');
+      }
+      
       const model = genAI.getGenerativeModel({ 
         model: "gemini-2.0-flash-exp",
         generationConfig: {
@@ -161,25 +171,9 @@ export function UploadInvoice() {
         vendor: String(rawInvoiceData.vendor),
       };
       
-      // Save invoice data to backend
-      const saveResponse = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...invoiceData,
-          id: Date.now().toString(),
-          status: 'pending',
-        }),
-      });
-
-      if (!saveResponse.ok) {
-        const errorData = await saveResponse.json();
-        throw new Error(errorData.error || 'Failed to save invoice data');
-      }
-
-      const savedData = await saveResponse.json();
+      // Save invoice data to client-side storage
+      const { invoiceStorage } = await import('@/lib/storage');
+      const savedData = invoiceStorage.create(invoiceData);
       
       // Update status to success
       setUploadProgress(prev => ({
@@ -330,9 +324,9 @@ export function UploadInvoice() {
                     )}
                     {uploadProgress[file.name].result && (
                       <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                        <p className="font-medium">Invoice Number: {uploadProgress[file.name].result.invoiceNumber}</p>
-                        <p>Type: {uploadProgress[file.name].result.type}</p>
-                        <p>Amount: ${uploadProgress[file.name].result.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="font-medium">Invoice Number: {uploadProgress[file.name].result?.invoiceNumber}</p>
+                        <p>Type: {uploadProgress[file.name].result?.type}</p>
+                        <p>Amount: ${uploadProgress[file.name].result?.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
                     )}
                   </div>

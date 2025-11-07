@@ -1,16 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-
-interface Invoice {
-  id: string
-  invoiceNumber: string
-  type: string
-  date: string
-  amount: number
-  vendor: string
-  status: string
-}
+import { invoiceStorage, type Invoice } from '@/lib/storage'
 
 export function InvoiceList() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -21,13 +12,9 @@ export function InvoiceList() {
     fetchInvoices()
   }, [])
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = () => {
     try {
-      const response = await fetch('/api/invoices')
-      if (!response.ok) {
-        throw new Error('Failed to fetch invoices')
-      }
-      const data = await response.json()
+      const data = invoiceStorage.getAll()
       setInvoices(data)
     } catch (error) {
       console.error('Error fetching invoices:', error)
@@ -36,24 +23,15 @@ export function InvoiceList() {
     }
   }
 
-  const handleStatusChange = async (invoiceId: string) => {
+  const handleStatusChange = (invoiceId: string) => {
     try {
       const invoice = invoices.find(inv => inv.id === invoiceId)
       if (!invoice) return
 
       const newStatus = invoice.status === 'approved' ? 'pending' : 'approved'
       
-      const response = await fetch(`/api/invoices/${invoiceId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update invoice status')
-      }
+      // Update in storage
+      invoiceStorage.updateStatus(invoiceId, newStatus)
 
       // Update local state
       setInvoices(prevInvoices =>
